@@ -1,0 +1,17 @@
+{
+    "compilerOptions": {
+        "experimentalDecorators": true,
+        "module": "nodenext",
+        "moduleResolution": "node",
+        "declaration": false,
+        "removeComments": true,
+        "target": "es2019",
+        "baseUrl": "./",
+        "alwaysStrict": true,
+        "strict": true,
+        "noImplicitAny": true,
+        "noImplicitThis": true,
+        "noUncheckedIndexedAccess": true
+    },
+    "exclude": ["node_modules"]
+}
