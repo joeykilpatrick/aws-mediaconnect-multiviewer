@@ -1,6 +1,6 @@
 ### AWS MediaConnect Multiviewer
 
-A multiviewer for AWS MediaConnect flows.
+A multiviewer for AWS MediaConnect flows. Companion blog post [here](https://blog.kilpatrick.cloud/posts/mediaconnect-multiviewer/).
 
 This repository is a proof-of-concept for live video mixing for MediaConnect flows using AWS ECS containers. In this case, four MediaConnect streams are mixed by an FFmpeg container to produce a 4-panel video stream.
 
