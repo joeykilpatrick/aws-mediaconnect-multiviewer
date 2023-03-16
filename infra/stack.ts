@@ -23,31 +23,31 @@ const stack = new CDK.Stack(app, stackNameKebab, {
     },
 });
 
-enum VideoStream {
-    RED = 'red',
-    YELLOW = 'yellow',
-    GREEN = 'green',
-    BLUE = 'blue',
+enum Video {
+    GALAXY = 'galaxy',
+    SURF = 'surf',
+    TUNNEL = 'tunnel',
+    WAVES = 'waves',
 }
 
 const multiviewerVpc = new PublicVpc(stack, 'multiviewerVpc', environment);
 
-function createFlow(color: VideoStream): {flow: MediaConnect.CfnFlow, output: MediaConnect.CfnFlowOutput} {
+function createFlow(video: Video): {flow: MediaConnect.CfnFlow, output: MediaConnect.CfnFlowOutput} {
 
-    const flowName: string = `${stackNameKebab}-${color}`;
+    const flowName: string = `${stackNameKebab}-${video}`;
 
-    const flow = new MediaConnect.CfnFlow(stack, `${color}Flow`, {
+    const flow = new MediaConnect.CfnFlow(stack, `${video}Flow`, {
         name: flowName,
         source: {
             name: `${flowName}-source`,
-            description: `${flowName}-source`,
+            description: `Stream of the input '${video}' video looped.`,
             ingestPort: 3000,
             protocol: "srt-listener",
             whitelistCidr: "0.0.0.0/0",
         },
     });
 
-    const output = new MediaConnect.CfnFlowOutput(stack, `${color}FlowOutput`, {
+    const output = new MediaConnect.CfnFlowOutput(stack, `${video}FlowOutput`, {
         flowArn: flow.attrFlowArn,
         port: 3001,
         cidrAllowList: [
@@ -63,11 +63,11 @@ function createFlow(color: VideoStream): {flow: MediaConnect.CfnFlow, output: Me
 
 }
 
-const flows = enumMap(VideoStream, createFlow);
+const flows = enumMap(Video, createFlow);
 
-const flowStart = enumMap(VideoStream, (color) => {
-    return new StartMediaConnectFlow(stack, `${color}SourceFlowStart`, {
-        flowArn: flows[color].flow.attrFlowArn
+const flowStart = enumMap(Video, (video) => {
+    return new StartMediaConnectFlow(stack, `${video}SourceFlowStart`, {
+        flowArn: flows[video].flow.attrFlowArn
     });
 })
 
@@ -76,7 +76,7 @@ const multiviewerFlow = new MediaConnect.CfnFlow(stack, 'multiviewerFlow', {
     name: multiviewerFlowName,
     source: {
         name: `${multiviewerFlowName}-source`,
-        description: `${multiviewerFlowName}-source`,
+        description: `Multiviewer 4-panel output of the other 4 streams.`,
         ingestPort: 3000,
         protocol: "srt-listener",
         whitelistCidr: "0.0.0.0/0",
@@ -97,9 +97,9 @@ const taskRole = new IAM.Role(stack, 'taskRole', {
     assumedBy: new IAM.ServicePrincipal('ecs-tasks.amazonaws.com'),
 });
 
-function createSourceTaskDefinition(color: VideoStream): ECS.TaskDefinition {
+function createSourceTaskDefinition(video: Video): ECS.TaskDefinition {
 
-    const videoSourceTaskDefinition = new ECS.FargateTaskDefinition(stack, `${color}VideoSourceTaskDefinition`, {
+    const videoSourceTaskDefinition = new ECS.FargateTaskDefinition(stack, `${video}VideoSourceTaskDefinition`, {
         cpu: 1024, // 1 vCPU
         memoryLimitMiB: 2048, // 2 GiB
         runtimePlatform: {
@@ -108,24 +108,24 @@ function createSourceTaskDefinition(color: VideoStream): ECS.TaskDefinition {
         },
         taskRole,
     });
-    const videoSourceContainer = videoSourceTaskDefinition.addContainer(`${color}VideoSourceContainer`, {
-        containerName: `${color}-video-source`,
+    const videoSourceContainer = videoSourceTaskDefinition.addContainer(`${video}VideoSourceContainer`, {
+        containerName: `${video}-video-source`,
         image: ECS.ContainerImage.fromAsset('./video-source'),
         logging: ECS.LogDriver.awsLogs({
-            streamPrefix: `${stackNameKebab}-${color}-video-source-container`,
+            streamPrefix: `${stackNameKebab}-${video}-video-source-container`,
         }),
     });
 
-    const { flow } = flows[color];
+    const { flow } = flows[video];
 
-    videoSourceContainer.addEnvironment('COLOR', color);
+    videoSourceContainer.addEnvironment('VIDEO', video);
     videoSourceContainer.addEnvironment('TARGET_URL', `srt://${flow.attrSourceIngestIp}:${flow.attrSourceSourceIngestPort}`);
 
     return videoSourceTaskDefinition;
 
 }
 
-const sourceTaskDefinition = enumMap(VideoStream, createSourceTaskDefinition);
+const sourceTaskDefinition = enumMap(Video, createSourceTaskDefinition);
 
 const videoMixerTaskDefinition = new ECS.FargateTaskDefinition(stack, 'videoMixerTaskDefinition', {
     cpu: 1024, // 1 vCPU
@@ -144,8 +144,8 @@ const videoMixerContainer = videoMixerTaskDefinition.addContainer('videoMixerCon
     }),
 });
 
-Object.entries(flows).forEach(([color, {flow, output}]) => {
-    videoMixerContainer.addEnvironment(`${color.toUpperCase()}_SOURCE_URL`, `srt://${flow.attrSourceIngestIp}:${output.port}`)
+Object.entries(flows).forEach(([video, {flow, output}]) => {
+    videoMixerContainer.addEnvironment(`${video.toUpperCase()}_SOURCE_URL`, `srt://${flow.attrSourceIngestIp}:${output.port}`)
 });
 videoMixerContainer.addEnvironment('OUTPUT_URL', `srt://${multiviewerFlow.attrSourceIngestIp}:${multiviewerFlow.attrSourceSourceIngestPort}`);
 
@@ -159,19 +159,19 @@ const cluster = new ECS.Cluster(stack, "videoMixerCluster", {
     }),
 });
 
-const sourceService = enumMap(VideoStream, (color) => {
+const sourceService = enumMap(Video, (video) => {
 
-    const service = new ECS.FargateService(stack, `${color}SourceService`, {
+    const service = new ECS.FargateService(stack, `${video}SourceService`, {
         cluster,
         securityGroups: [ multiviewerVpc.wideOpenSecurityGroup ],
-        taskDefinition: sourceTaskDefinition[color],
+        taskDefinition: sourceTaskDefinition[video],
         assignPublicIp: true,
         vpcSubnets: {
             subnets: [ multiviewerVpc.publicSubnet ],
         },
     });
 
-    service.node.addDependency(flowStart[color]);
+    service.node.addDependency(flowStart[video]);
 
     return service;
 

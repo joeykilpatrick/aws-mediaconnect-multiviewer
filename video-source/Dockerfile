@@ -4,4 +4,4 @@ COPY . .
 
 RUN apk add --no-cache ffmpeg
 
-CMD ffmpeg -re -loop 1 -i solid-color-${COLOR}.png -f mpegts ${TARGET_URL}
+CMD ffmpeg -stream_loop -1 -i ${VIDEO}.mp4 -f mpegts ${TARGET_URL}

@@ -50,6 +50,8 @@ The output of the multiviewer stream can be viewed using this SRT URL. If you ha
 $ ffplay -i srt://XXX.XXX.XXX.XXX:3001
 ```
 
+*In may take a few minutes for the output to be viewable as all of the containers are initialized and begin streaming.*
+
 To tear down all resources,
 
 ```shell
